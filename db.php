@@ -653,6 +653,321 @@ class MySite
         }
     }
 
+    public function addProduct($name, $price, $description, $stock, $brand, $image)
+    {
+        $isInputValid = isset($name) && !empty($name) && isset($price) && !empty($price) && isset($description) && !empty($description) && isset($stock) && !empty($stock) && isset($brand) && !empty($brand) && isset($image) && !empty($image);
+
+        // Check if the login form has been submitted
+        if ($isInputValid) {
+            $productId = uniqid();
+            // Open a database connection
+            $connection = $this->openConnection();
+
+            // Prepare and execute the SQL query to retrieve user data based on email and password
+            $sql = "INSERT INTO products (id, name, price, description, stock, brand)
+                    VALUES (:id, :name, :price, :description, :stock, :brand)";
+
+            $query = $connection->prepare($sql);
+            $query->bindParam(':id', $productId);
+            $query->bindParam(':name', $name);
+            $query->bindParam(':price', $price);
+            $query->bindParam(':description', $description);
+            $query->bindParam(':stock', $stock);
+            $query->bindParam(':brand', $brand);
+            $query->execute();
+
+            $lastInsertedId = $connection->lastInsertId();
+
+            $targetDir = "images/products/"; // Change this to your desired upload directory
+            $uploadOk = 1;
+
+            // Loop through each uploaded file
+            foreach ($image["tmp_name"] as $key => $tmp_name) {
+                if ($_FILES["image"]["error"][$key] == 0) {
+                    $file_name = $image["name"][$key];
+                    $file_size = $image["size"][$key];
+                    $file_tmp = $image["tmp_name"][$key];
+                    $file_type = $image["type"][$key];
+
+                    // Check if file is an actual image
+                    $check = getimagesize($file_tmp);
+                    if ($check === false) {
+                        echo "File $file_name is not an image.<br>";
+                        $uploadOk = 0;
+                    }
+
+                    // Check if file already exists
+                    if (file_exists($targetDir . $file_name)) {
+                        echo "File $file_name already exists.<br>";
+                        $uploadOk = 0;
+                    }
+
+                    // Check file size
+                    if ($file_size > 50000000) {
+                        echo "File $file_name is too large.<br>";
+                        $uploadOk = 0;
+                    }
+
+                    // Allow only certain file formats
+                    $allowedExtensions = array("jpg", "jpeg", "png");
+                    $fileExtension = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+
+                    if (!in_array($fileExtension, $allowedExtensions)) {
+                        echo "File $file_name is not allowed. Only JPG, JPEG, PNG, and GIF files are allowed.<br>";
+                        $uploadOk = 0;
+                    }
+
+                    // If everything is ok, try to upload file
+                    if ($uploadOk == 1) {
+
+                        $newFileName =  uniqid() . '_' . basename($image["name"][$key]);
+                        $targetFile = $targetDir . $newFileName;
+
+                        if (move_uploaded_file($file_tmp, "../" . $targetFile)) {
+
+                            $result = $this->uploadProductImage($targetFile, $productId);
+                            if ($result) {
+                                echo "File $file_name has been uploaded successfully.\n";
+                            }
+                        } else {
+                            echo $file_tmp . "Error uploading file $file_name.<br>";
+                        }
+                    }
+                } else {
+                    echo "Error uploading file: " . $image["name"][$key] . "<br>";
+                }
+            }
+
+            if ($query) {
+                echo json_encode(array(
+                    "status" => 1,
+                    "message" => $lastInsertedId . $targetFile . "  " . $file_name . "  " . $newFileName . " " .  "Product added successfully",
+                ));
+            } else {
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "Error. Product post failed",
+                ));
+            }
+        } else {
+
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "Missing data",
+            ));
+        }
+    }
+
+    public function addOrder($productId, $quantity)
+    {
+        if (!isset($_SESSION)) {
+            session_start();
+        }
+
+        $isInputValid = isset($productId) && !empty($productId) && isset($quantity) && !empty($quantity);
+
+        // Check if the login form has been submitted
+        if ($isInputValid) {
+            try {
+                // Open a database connection
+                $connection = $this->openConnection();
+
+                // Prepare and execute the SQL query to retrieve user data based on email and password
+                $sql = "INSERT INTO orders (id,product_id, quantity, user_id)
+                    VALUES (:id,:product_id, :quantity, :user_id)";
+
+                $orderId = uniqid();
+
+                $query = $connection->prepare($sql);
+                $query->bindParam(':id', $orderId);
+                $query->bindParam(':product_id', $productId);
+                $query->bindParam(':quantity', $quantity);
+                $query->bindParam(':user_id', $_SESSION['userdata']['user_id']);
+                $query->execute();
+
+                echo json_encode(array(
+                    "status" => 1,
+                    "message" => "Order successfully place",
+                ));
+            } catch (PDOException $e) {
+                // Handle PDOException
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "An error occurred: " . $e->getMessage(),
+                ));
+            } catch (Exception $e) {
+                // Handle other exceptions
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "An unexpected error occurred: " . $e->getMessage(),
+                ));
+            }
+        } else {
+
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "Missing data",
+            ));
+        }
+    }
+
+    public function getOrders()
+    {
+        // Open a database connection
+        $connection = $this->openConnection();
+
+        // Prepare and execute the SQL query to retrieve user data based on email and password
+        // $sql = "SELECT * FROM `products`";
+        // $sql = "SELECT o.*, GROUP_CONCAT(pi.image) AS products_images
+        //         FROM orders o
+        //         LEFT JOIN products_images pi ON p.id = pi.product_id
+        //         GROUP BY p.id";
+
+        // $sql = "SELECT 
+        //             orders.*,
+        //             -- CONCAT(users.first_name, ' ', users.middle_name, ' ', users.last_name) AS user_name,
+        //             products.id AS product_id,
+        //             products.name AS product_name,
+        //             products.price AS product_price,
+        //         FROM 
+        //             orders
+        //         -- JOIN 
+        //         --     users ON orders.user_id = users.id
+        //         JOIN 
+        //             products ON orders.product_id = products.id";
+
+        $sql = "SELECT 
+                    o.*, 
+                    GROUP_CONCAT(pi.image) AS images,
+                    CONCAT(u.first_name, ' ', COALESCE(u.middle_name, ''), ' ', u.last_name) AS customer_name,
+                    p.name,
+                    p.price,
+                    p.description,
+                    p.stock,
+                    p.brand
+                FROM orders o
+                LEFT JOIN products p ON o.product_id = p.id
+                LEFT JOIN users u ON o.user_id = u.id
+                LEFT JOIN products_images pi ON pi.product_id = p.id
+                GROUP BY o.id";
+
+        // $sql = "SELECT * from `orders`";
+
+        $query = $connection->prepare($sql);
+
+        $query->execute();
+
+        $orders = $query->fetchAll(); // Fetching single data from the server and it will return an array
+
+        foreach ($orders as &$order) {
+            if ($order['images']) {
+                $order['images'] = explode(',', $order['images']);
+            } else {
+                $order['images'] = [];
+            }
+        }
+        // foreach ($products as &$product) {
+        //     if ($product['products_images']) {
+        //         $product['products_images'] = explode(',', $product['products_images']);
+        //     } else {
+        //         $product['products_images'] = [];
+        //     }
+        // }
+
+        echo json_encode(array(
+            "status" => 1,
+            "message" => "Products fetched successfully",
+            "data" => $orders
+        ));
+    }
+
+    public function uploadProductImage($targetPath, $productId)
+    {
+        $imageId = uniqid();
+        // Open a database connection
+        $connection = $this->openConnection();
+
+        // Insert the image into the images table
+        $sql = "INSERT INTO products_images (id,image, product_id) VALUES (:id,:image, :product_id)";
+        $query = $connection->prepare($sql);
+        $query->bindParam(':id', $imageId);
+        $query->bindParam(':image', $targetPath);
+        $query->bindParam(':product_id', $productId);
+        $result = $query->execute();
+
+        return $result;
+    }
+
+    public function getProducts()
+    {
+        // Open a database connection
+        $connection = $this->openConnection();
+
+        // Prepare and execute the SQL query to retrieve user data based on email and password
+        // $sql = "SELECT * FROM `products`";
+        $sql = "SELECT p.*, GROUP_CONCAT(pi.image) AS products_images
+                FROM products p 
+                LEFT JOIN products_images pi ON p.id = pi.product_id
+                GROUP BY p.id";
+
+        $query = $connection->prepare($sql);
+
+        $query->execute();
+
+        $products = $query->fetchAll(); // Fetching single data from the server and it will return an array
+        foreach ($products as &$product) {
+            if ($product['products_images']) {
+                $product['products_images'] = explode(',', $product['products_images']);
+            } else {
+                $product['products_images'] = [];
+            }
+        }
+
+        echo json_encode(array(
+            "status" => 1,
+            "message" => "Products fetched successfully",
+            "data" => $products
+        ));
+    }
+
+    public function deleteProduct($product_id)
+    {
+        if (isset($product_id)) {
+            try {
+                $connection = $this->openConnection();
+
+                // Prepare and execute the SQL query to delete the product
+                $sql = "DELETE FROM products WHERE id = :product_id";
+                $query = $connection->prepare($sql);
+                $query->bindParam(':product_id', $product_id);
+
+                // Execute the query
+                $query->execute();
+
+                echo json_encode(array(
+                    "status" => 1,
+                    "message" => "Product deleted successfully",
+                ));
+            } catch (PDOException $e) {
+                // Handle PDOException
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "An error occurred: " . $e->getMessage(),
+                ));
+            } catch (Exception $e) {
+                // Handle other exceptions
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "An unexpected error occurred: " . $e->getMessage(),
+                ));
+            }
+        } else {
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "Missing data",
+            ));
+        }
+    }
 
     public function loginAdminUser()
     {
