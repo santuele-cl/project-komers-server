@@ -2,10 +2,7 @@
 require_once('../cors.php');
 require_once('../db.php');
 
-
 $requestPayload = file_get_contents('php://input');
 $decodedRequestPayload = json_decode($requestPayload, true);
 
-if (isset($decodedRequestPayload["orderId"])) {
-    $operations->deleteOrder($decodedRequestPayload["orderId"]);
-}
+$operations->addOrder($decodedRequestPayload["productId"], $decodedRequestPayload["quantity"]);

@@ -215,6 +215,160 @@ class MySite
         }
     }
 
+    public function addUser($first_name, $middle_name, $last_name, $contact_num, $role, $house_number, $street, $barangay, $city, $province, $region, $country, $zipcode, $email, $password)
+    {
+        // Check if all required data is provided
+        $isValidInput = isset($first_name, $last_name, $contact_num, $role, $house_number, $street, $barangay, $city, $province, $region, $country, $zipcode, $email, $password) &&
+            !empty($first_name) && !empty($last_name) && !empty($contact_num) &&
+            !empty($role) && !empty($house_number) && !empty($street) &&
+            !empty($barangay) && !empty($city) && !empty($province) &&
+            !empty($region) && !empty($country) && !empty($zipcode) &&
+            !empty($email) && !empty($password);
+
+        // Check if the input data is valid
+        if ($isValidInput) {
+            try {
+                // Open a database connection
+                $connection = $this->openConnection();
+
+                // Check if email already exists
+                $sqlCheckEmail = "SELECT COUNT(*) FROM users WHERE email = :email";
+                $queryCheckEmail = $connection->prepare($sqlCheckEmail);
+                $queryCheckEmail->bindParam(':email', $email);
+                $queryCheckEmail->execute();
+                $emailExists = $queryCheckEmail->fetchColumn();
+
+                if ($emailExists) {
+                    echo json_encode(array(
+                        "status" => 0,
+                        "message" => "Email already exists",
+                    ));
+                    return;
+                }
+
+                // Start a transaction to ensure atomicity
+                $connection->beginTransaction();
+
+                // Insert user data
+                $userId = uniqid();
+                $hashedPassword = md5($password);
+                $addressId = uniqid();
+
+                // Insert address data
+                $sqlAddressInsert = "INSERT INTO addresses (id, house_number, street, barangay, city, province, region, country, zipcode) 
+                     VALUES (:addressId, :houseNumber, :street, :barangay, :city, :province, :region, :country, :zipcode)";
+                $queryAddressInsert = $connection->prepare($sqlAddressInsert);
+                $queryAddressInsert->bindParam(':addressId', $addressId);
+                $queryAddressInsert->bindParam(':houseNumber', $house_number);
+                $queryAddressInsert->bindParam(':street', $street);
+                $queryAddressInsert->bindParam(':barangay', $barangay);
+                $queryAddressInsert->bindParam(':city', $city);
+                $queryAddressInsert->bindParam(':province', $province);
+                $queryAddressInsert->bindParam(':region', $region);
+                $queryAddressInsert->bindParam(':country', $country);
+                $queryAddressInsert->bindParam(':zipcode', $zipcode);
+                $queryAddressInsert->execute();
+
+                $sqlUserInsert = "INSERT INTO users (id, first_name, middle_name, last_name, contact_num, role, email, password, address_id) 
+                              VALUES (:userId, :firstName, :middleName, :lastName, :contactNum, :role, :email, :password, :addressId)";
+                $queryUserInsert = $connection->prepare($sqlUserInsert);
+                $queryUserInsert->bindParam(':userId', $userId);
+                $queryUserInsert->bindParam(':firstName', $first_name);
+                $queryUserInsert->bindParam(':middleName', $middle_name);
+                $queryUserInsert->bindParam(':lastName', $last_name);
+                $queryUserInsert->bindParam(':contactNum', $contact_num);
+                $queryUserInsert->bindParam(':role', $role);
+                $queryUserInsert->bindParam(':email', $email);
+                $queryUserInsert->bindParam(':password', $hashedPassword);
+                $queryUserInsert->bindParam(':addressId', $addressId);
+                $queryUserInsert->execute();
+
+                $connection->commit();
+
+                echo json_encode(array(
+                    "status" => 1,
+                    "message" => "User added successfully"
+                ));
+            } catch (PDOException $e) {
+                // Rollback the transaction and handle PDOException
+                $connection->rollBack();
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "An error occurred: " . $e->getMessage(),
+                ));
+            } catch (Exception $e) {
+                // Rollback the transaction and handle other exceptions
+                $connection->rollBack();
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "An unexpected error occurred: " . $e->getMessage(),
+                ));
+            }
+        } else {
+            // Handle missing data
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "Missing data",
+            ));
+        }
+    }
+
+    public function getAllUsers()
+    {
+        try {
+            // Open a database connection
+            $connection = $this->openConnection();
+
+            // Prepare and execute the SQL query to retrieve user data
+            $sql = "SELECT 
+                        u.id, 
+                        u.first_name, 
+                        u.middle_name, 
+                        u.last_name, 
+                        u.address_id, 
+                        u.email, 
+                        u.contact_num, 
+                        u.role, 
+                        u.isDeactivated, 
+                        u.createdAt, 
+                        u.updatedAt, 
+                        a.house_number, 
+                        a.street, 
+                        a.barangay, 
+                        a.city, 
+                        a.province, 
+                        a.region, 
+                        a.country, 
+                        a.zipcode
+                    FROM 
+                        users u
+                    LEFT JOIN 
+                        addresses a ON u.address_id = a.id";
+
+
+            $query = $connection->prepare($sql);
+            $query->execute();
+
+            $users = $query->fetchAll(); // Fetching data from the server and it will return an array
+
+            echo json_encode(array(
+                "status" => 1,
+                "message" => "Users fetched successfully",
+                "data" => $users
+            ));
+        } catch (PDOException $e) {
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "An error occurred: " . $e->getMessage(),
+            ));
+        } catch (Exception $e) {
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "An unexpected error occurred: " . $e->getMessage(),
+            ));
+        }
+    }
+
     public function addProduct($name, $price, $description, $stock, $brand, $image)
     {
         $isInputValid = isset($name) && !empty($name) && isset($price) && !empty($price) && isset($description) && !empty($description) && isset($stock) && !empty($stock) && isset($brand) && !empty($brand) && isset($image) && !empty($image);
@@ -316,6 +470,97 @@ class MySite
             echo json_encode(array(
                 "status" => 0,
                 "message" => "Missing data",
+            ));
+        }
+    }
+    public function updateProduct()
+    {
+        try {
+            $requestPayload = file_get_contents('php://input');
+            $decodedRequestPayload = json_decode($requestPayload, true);
+
+            $isInputValid =  isset(
+                $decodedRequestPayload["productId"],
+                $decodedRequestPayload["name"],
+                $decodedRequestPayload["price"],
+                $decodedRequestPayload["description"],
+                $decodedRequestPayload["stock"],
+                $decodedRequestPayload["brand"],
+            ) &&
+                !empty($decodedRequestPayload["productId"]) && !empty($decodedRequestPayload["name"]) &&
+                !empty($decodedRequestPayload["price"]) && !empty($decodedRequestPayload["description"]) &&
+                !empty($decodedRequestPayload["stock"]) && !empty($decodedRequestPayload["brand"]);
+
+            // Check if the input data is valid
+            if ($isInputValid) {
+                $productId = $decodedRequestPayload["productId"];
+                $name = $decodedRequestPayload["name"];
+                $price = $decodedRequestPayload["price"];
+                $description = $decodedRequestPayload["description"];
+                $stock = $decodedRequestPayload["stock"];
+                $brand = $decodedRequestPayload["brand"];
+
+                // Open a database connection
+                $connection = $this->openConnection();
+
+                // Start a transaction to ensure atomicity
+                $connection->beginTransaction();
+
+                // Prepare and execute the SQL query to update the product
+                $sql = "UPDATE products
+                    SET name = :name, price = :price, description = :description, stock = :stock, brand = :brand
+                    WHERE id = :productId";
+
+                $query = $connection->prepare($sql);
+                $query->bindParam(':productId', $productId);
+                $query->bindParam(':name', $name);
+                $query->bindParam(':price', $price);
+                $query->bindParam(':description', $description);
+                $query->bindParam(':stock', $stock);
+                $query->bindParam(':brand', $brand);
+                $query->execute();
+
+                // Update product images (if any)
+
+                // Clean up existing product images (delete previous images, if any)
+
+                // Upload new product images (if any)
+
+                // Commit the transaction
+                $connection->commit();
+
+                // Check if the query was successful
+                if ($query) {
+                    echo json_encode(array(
+                        "status" => 1,
+                        "message" => "Product updated successfully",
+                    ));
+                } else {
+                    echo json_encode(array(
+                        "status" => 0,
+                        "message" => "Error. Product update failed",
+                    ));
+                }
+            } else {
+                // Handle missing data
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "Missing data",
+                ));
+            }
+        } catch (PDOException $e) {
+            // Rollback the transaction and handle PDOException
+            $connection->rollBack();
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "An error occurred: " . $e->getMessage(),
+            ));
+        } catch (Exception $e) {
+            // Rollback the transaction and handle other exceptions
+            $connection->rollBack();
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "An unexpected error occurred: " . $e->getMessage(),
             ));
         }
     }
@@ -462,6 +707,7 @@ class MySite
         }
     }
 
+
     public function cartToOrder($cartId)
     {
         if (!isset($_SESSION)) {
@@ -523,6 +769,131 @@ class MySite
             }
         } else {
             // Handle missing data
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "Missing data",
+            ));
+        }
+    }
+
+    public function updateOrderStatus($orderId, $newStatus)
+    {
+        if (!isset($_SESSION)) {
+            session_start();
+        }
+
+        $isInputValid = isset($orderId, $newStatus) && !empty($orderId) && !empty($newStatus);
+
+        // Check if the input data is valid
+        if ($isInputValid) {
+            try {
+                // Open a database connection
+                $connection = $this->openConnection();
+
+                // Start a transaction to ensure atomicity
+                $connection->beginTransaction();
+
+                // Retrieve the quantity and product ID of the order
+                $sqlOrder = "SELECT product_id, status, quantity FROM orders WHERE id = :orderId";
+                $queryOrder = $connection->prepare($sqlOrder);
+                $queryOrder->bindParam(':orderId', $orderId);
+                $queryOrder->execute();
+                $order = $queryOrder->fetch();
+
+                if ($order) {
+
+
+                    // Update the order status
+                    $sqlUpdateOrder = "UPDATE orders SET status = :newStatus WHERE id = :orderId";
+                    $queryUpdateOrder = $connection->prepare($sqlUpdateOrder);
+                    $queryUpdateOrder->bindParam(':orderId', $orderId);
+                    $queryUpdateOrder->bindParam(':newStatus', $newStatus);
+                    $queryUpdateOrder->execute();
+
+                    // If the new status is 'cancelled', add the order quantity back to the product stock
+                    // if ($newStatus === 'cancelled' || $newStatus === 'failed-transaction') {
+                    if (
+                        (
+                            $newStatus === 'cancelled' && ($order["status"] === "pending" || $order["status"] === "packed")) ||
+                        $newStatus === 'failed-transaction'
+                    ) {
+                        $sqlUpdateStock = "UPDATE products SET stock = stock + :quantity WHERE id = :productId";
+                        $queryUpdateStock = $connection->prepare($sqlUpdateStock);
+                        $queryUpdateStock->bindParam(':quantity', $order['quantity']);
+                        $queryUpdateStock->bindParam(':productId', $order['product_id']);
+                        $queryUpdateStock->execute();
+                    }
+                    // }
+
+                    // Commit the transaction
+                    $connection->commit();
+
+                    echo json_encode(array(
+                        "status" => 1,
+                        "message" => "Order status successfully updated to $newStatus",
+                    ));
+                } else {
+                    echo json_encode(array(
+                        "status" => 0,
+                        "message" => "Order not found or already cancelled",
+                    ));
+                }
+            } catch (PDOException $e) {
+                // Rollback the transaction and handle PDOException
+                $connection->rollBack();
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "An error occurred: " . $e->getMessage(),
+                ));
+            } catch (Exception $e) {
+                // Rollback the transaction and handle other exceptions
+                $connection->rollBack();
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "An unexpected error occurred: " . $e->getMessage(),
+                ));
+            }
+        } else {
+            // Handle missing data
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "Missing data",
+            ));
+        }
+    }
+
+    public function deleteOrder($orderId)
+    {
+        if (isset($orderId)) {
+            try {
+                $connection = $this->openConnection();
+
+                // Prepare and execute the SQL query to delete the product
+                $sql = "DELETE FROM orders WHERE id = :orderId";
+                $query = $connection->prepare($sql);
+                $query->bindParam(':orderId', $orderId);
+
+                // Execute the query
+                $query->execute();
+
+                echo json_encode(array(
+                    "status" => 1,
+                    "message" => "Order deleted successfully",
+                ));
+            } catch (PDOException $e) {
+                // Handle PDOException
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "An error occurred: " . $e->getMessage(),
+                ));
+            } catch (Exception $e) {
+                // Handle other exceptions
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "An unexpected error occurred: " . $e->getMessage(),
+                ));
+            }
+        } else {
             echo json_encode(array(
                 "status" => 0,
                 "message" => "Missing data",
