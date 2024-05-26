@@ -156,17 +156,19 @@ class MySite
         // Check if the login form has been submitted
         if (isset($email) && isset($password)) {
             // User input
+            $userId = uniqid();
             $hashedPassword = md5($password);
 
             // Open a database connection
             $connection = $this->openConnection();
 
             // Prepare and execute the SQL query to retrieve user data based on email and password
-            $sql = "INSERT INTO users (email, password)
-            VALUES (:email, :password)";
+            $sql = "INSERT INTO users (id,email, password)
+            VALUES (:id, :email, :password)";
 
             $query = $connection->prepare($sql);
 
+            $query->bindParam(':id', $userId);
             $query->bindParam(':email', $email);
             $query->bindParam(':password', $hashedPassword);
 
