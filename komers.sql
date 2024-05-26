@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 25, 2024 at 04:10 PM
+-- Generation Time: May 26, 2024 at 06:40 AM
 -- Server version: 10.4.28-MariaDB
 -- PHP Version: 8.2.4
 
@@ -47,10 +47,27 @@ CREATE TABLE `addresses` (
 
 CREATE TABLE `carts` (
   `id` varchar(255) NOT NULL,
+  `user_id` varchar(255) NOT NULL,
+  `product_id` varchar(255) NOT NULL,
   `quantity` int(11) NOT NULL DEFAULT 1,
+  `total_price` int(11) NOT NULL,
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
   `updatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Triggers `carts`
+--
+DELIMITER $$
+CREATE TRIGGER `calculate_cart_total_price` BEFORE INSERT ON `carts` FOR EACH ROW BEGIN
+    DECLARE product_price INT;
+    -- Retrieve the product price based on the product_id from the products table
+    SELECT price INTO product_price FROM products WHERE id = NEW.product_id;
+    -- Calculate the total price
+    SET NEW.total_price = product_price * NEW.quantity;
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -68,16 +85,6 @@ CREATE TABLE `orders` (
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
   `updatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `orders`
---
-
-INSERT INTO `orders` (`id`, `user_id`, `product_id`, `quantity`, `status`, `total_price`, `createdAt`, `updatedAt`) VALUES
-('', 'adsfa', '6651df60bdc5b', 1, 'pending', 25, '2024-05-25 13:25:17', '2024-05-25 13:25:17'),
-('6651e9d1732a0', 'adsfa', '6651df60bdc5b', 12, 'pending', 300, '2024-05-25 13:38:25', '2024-05-25 13:38:25'),
-('6651e9e50f090', 'adsfa', '6651df60bdc5b', 12, 'pending', 300, '2024-05-25 13:38:45', '2024-05-25 13:38:45'),
-('6651ecf61e62d', 'adsfa', '6651ecebeba19', 3, 'pending', 66, '2024-05-25 13:51:50', '2024-05-25 13:51:50');
 
 --
 -- Triggers `orders`
@@ -110,14 +117,6 @@ CREATE TABLE `products` (
   `udpatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `products`
---
-
-INSERT INTO `products` (`id`, `name`, `price`, `description`, `stock`, `brand`, `createdAt`, `udpatedAt`) VALUES
-('6651df60bdc5b', 'asdf', 25, 'asdf', 2, 'asdf', '2024-05-25 12:53:52', '2024-05-25 13:04:12'),
-('6651ecebeba19', 'asdf', 22, 'adsf', 22, 'asdf', '2024-05-25 13:51:39', '2024-05-25 13:51:39');
-
 -- --------------------------------------------------------
 
 --
@@ -129,15 +128,6 @@ CREATE TABLE `products_images` (
   `product_id` varchar(255) NOT NULL,
   `image` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `products_images`
---
-
-INSERT INTO `products_images` (`id`, `product_id`, `image`) VALUES
-('6651df60c3f5c', '6651df60bdc5b', 'images/products/6651df60c3768_pexels-atbo-245240.jpg'),
-('6651ecebf0ac7', '6651ecebeba19', 'images/products/6651ecebf089b_pexels-cottonbro-studio-4064835.jpg'),
-('6651ecec009f4', '6651ecebeba19', 'images/products/6651ecec007a3_pexels-pixabay-273671.jpg');
 
 -- --------------------------------------------------------
 
@@ -160,13 +150,6 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `users`
---
-
-INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `address_id`, `email`, `password`, `contact_num`, `role`, `createdAt`, `updatedAt`) VALUES
-('adsfa', 'len', 'arr', 'san', NULL, 'asdf', '912ec803b2ce49e4a541068d495ab570', '', 'admin', '2024-05-25 20:53:02', '2024-05-25 21:56:56');
-
---
 -- Indexes for dumped tables
 --
 
@@ -180,7 +163,8 @@ ALTER TABLE `addresses`
 -- Indexes for table `carts`
 --
 ALTER TABLE `carts`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `product_id` (`product_id`);
 
 --
 -- Indexes for table `orders`
@@ -214,6 +198,12 @@ ALTER TABLE `users`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `carts`
+--
+ALTER TABLE `carts`
+  ADD CONSTRAINT `carts_ibfk_1` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `orders`
