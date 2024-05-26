@@ -252,11 +252,25 @@ class MySite
                 // Insert user data
                 $userId = uniqid();
                 $hashedPassword = md5($password);
-                $addressId = uniqid();
+
+                $sqlUserInsert = "INSERT INTO users (id, first_name, middle_name, last_name, contact_num, role, email, password) 
+                              VALUES (:userId, :firstName, :middleName, :lastName, :contactNum, :role, :email, :password)";
+                $queryUserInsert = $connection->prepare($sqlUserInsert);
+                $queryUserInsert->bindParam(':userId', $userId);
+                $queryUserInsert->bindParam(':firstName', $first_name);
+                $queryUserInsert->bindParam(':middleName', $middle_name);
+                $queryUserInsert->bindParam(':lastName', $last_name);
+                $queryUserInsert->bindParam(':contactNum', $contact_num);
+                $queryUserInsert->bindParam(':role', $role);
+                $queryUserInsert->bindParam(':email', $email);
+                $queryUserInsert->bindParam(':password', $hashedPassword);
+                $queryUserInsert->execute();
 
                 // Insert address data
-                $sqlAddressInsert = "INSERT INTO addresses (id, house_number, street, barangay, city, province, region, country, zipcode) 
-                     VALUES (:addressId, :houseNumber, :street, :barangay, :city, :province, :region, :country, :zipcode)";
+                $addressId = uniqid();
+
+                $sqlAddressInsert = "INSERT INTO addresses (id, house_number, street, barangay, city, province, region, country, zipcode, user_id) 
+                     VALUES (:addressId, :houseNumber, :street, :barangay, :city, :province, :region, :country, :zipcode, :user_id)";
                 $queryAddressInsert = $connection->prepare($sqlAddressInsert);
                 $queryAddressInsert->bindParam(':addressId', $addressId);
                 $queryAddressInsert->bindParam(':houseNumber', $house_number);
@@ -267,21 +281,10 @@ class MySite
                 $queryAddressInsert->bindParam(':region', $region);
                 $queryAddressInsert->bindParam(':country', $country);
                 $queryAddressInsert->bindParam(':zipcode', $zipcode);
+                $queryAddressInsert->bindParam(':user_id', $userId);
+
                 $queryAddressInsert->execute();
 
-                $sqlUserInsert = "INSERT INTO users (id, first_name, middle_name, last_name, contact_num, role, email, password, address_id) 
-                              VALUES (:userId, :firstName, :middleName, :lastName, :contactNum, :role, :email, :password, :addressId)";
-                $queryUserInsert = $connection->prepare($sqlUserInsert);
-                $queryUserInsert->bindParam(':userId', $userId);
-                $queryUserInsert->bindParam(':firstName', $first_name);
-                $queryUserInsert->bindParam(':middleName', $middle_name);
-                $queryUserInsert->bindParam(':lastName', $last_name);
-                $queryUserInsert->bindParam(':contactNum', $contact_num);
-                $queryUserInsert->bindParam(':role', $role);
-                $queryUserInsert->bindParam(':email', $email);
-                $queryUserInsert->bindParam(':password', $hashedPassword);
-                $queryUserInsert->bindParam(':addressId', $addressId);
-                $queryUserInsert->execute();
 
                 $connection->commit();
 
@@ -325,7 +328,6 @@ class MySite
                         u.first_name, 
                         u.middle_name, 
                         u.last_name, 
-                        u.address_id, 
                         u.email, 
                         u.contact_num, 
                         u.role, 
@@ -343,7 +345,7 @@ class MySite
                     FROM 
                         users u
                     LEFT JOIN 
-                        addresses a ON u.address_id = a.id";
+                        addresses a ON u.id = a.user_id";
 
 
             $query = $connection->prepare($sql);
@@ -362,6 +364,203 @@ class MySite
                 "message" => "An error occurred: " . $e->getMessage(),
             ));
         } catch (Exception $e) {
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "An unexpected error occurred: " . $e->getMessage(),
+            ));
+        }
+    }
+    public function getProfile()
+    {
+        if (!isset($_SESSION)) {
+            session_start();
+        }
+        try {
+            // Open a database connection
+            $connection = $this->openConnection();
+
+            // Prepare and execute the SQL query to retrieve user data
+            $sql = "SELECT 
+                        u.id, 
+                        u.first_name, 
+                        u.middle_name, 
+                        u.last_name, 
+                        u.email, 
+                        u.contact_num, 
+                        u.role, 
+                        u.isDeactivated, 
+                        u.createdAt, 
+                        u.updatedAt, 
+                        a.house_number, 
+                        a.street, 
+                        a.barangay, 
+                        a.city, 
+                        a.province, 
+                        a.region, 
+                        a.country, 
+                        a.zipcode
+                    FROM 
+                        users u
+                    LEFT JOIN 
+                        addresses a ON u.id = a.user_id
+                    WHERE
+                        u.id = :userId";
+
+
+            $query = $connection->prepare($sql);
+            $query->bindParam(':userId', $_SESSION["userdata"]["user_id"]);
+            $query->execute();
+
+            $profile = $query->fetch(); // Fetching data from the server and it will return an array
+
+            echo json_encode(array(
+                "status" => 1,
+                "message" => "Profile fetched successfully",
+                "data" => $profile
+            ));
+        } catch (PDOException $e) {
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "An error occurred: " . $e->getMessage(),
+            ));
+        } catch (Exception $e) {
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "An unexpected error occurred: " . $e->getMessage(),
+            ));
+        }
+    }
+
+    public function updateProfile()
+    {
+        try {
+            $requestPayload = file_get_contents('php://input');
+            $decodedRequestPayload = json_decode($requestPayload, true);
+
+            $isInputValid = isset(
+                $decodedRequestPayload["userId"],
+                $decodedRequestPayload["first_name"],
+                $decodedRequestPayload["middle_name"],
+                $decodedRequestPayload["last_name"],
+                $decodedRequestPayload["contact_num"],
+                $decodedRequestPayload["house_number"],
+                $decodedRequestPayload["street"],
+                $decodedRequestPayload["barangay"],
+                $decodedRequestPayload["city"],
+                $decodedRequestPayload["province"],
+                $decodedRequestPayload["region"],
+                $decodedRequestPayload["country"],
+                $decodedRequestPayload["zipcode"],
+            ) &&
+                !empty($decodedRequestPayload["userId"]) &&
+                !empty($decodedRequestPayload["first_name"]) &&
+                !empty($decodedRequestPayload["middle_name"]) &&
+                !empty($decodedRequestPayload["last_name"]) &&
+                !empty($decodedRequestPayload["contact_num"]) &&
+                !empty($decodedRequestPayload["house_number"]) &&
+                !empty($decodedRequestPayload["street"]) &&
+                !empty($decodedRequestPayload["barangay"]) &&
+                !empty($decodedRequestPayload["city"]) &&
+                !empty($decodedRequestPayload["province"]) &&
+                !empty($decodedRequestPayload["region"]) &&
+                !empty($decodedRequestPayload["country"]) &&
+                !empty($decodedRequestPayload["zipcode"]);
+
+            // Open a database connection
+            $connection = $this->openConnection();
+
+            // Start a transaction to ensure atomicity
+            $connection->beginTransaction();
+
+            // Check if the input data is valid
+            if ($isInputValid) {
+                $userId = $decodedRequestPayload["userId"];
+                $first_name = $decodedRequestPayload["first_name"];
+                $middle_name = $decodedRequestPayload["middle_name"];
+                $last_name = $decodedRequestPayload["last_name"];
+                $contact_num = $decodedRequestPayload["contact_num"];
+                $house_number = $decodedRequestPayload["house_number"];
+                $street = $decodedRequestPayload["street"];
+                $barangay = $decodedRequestPayload["barangay"];
+                $city = $decodedRequestPayload["city"];
+                $province = $decodedRequestPayload["province"];
+                $region = $decodedRequestPayload["region"];
+                $country = $decodedRequestPayload["country"];
+                $zipcode = $decodedRequestPayload["zipcode"];
+
+                // Update the user information in the 'users' table
+                $sqlUser = "UPDATE users
+                        SET first_name = :first_name, 
+                            middle_name = :middle_name,
+                            last_name = :last_name, 
+                            contact_num = :contact_num
+                        WHERE id = :userId";
+
+                $queryUser = $connection->prepare($sqlUser);
+                $queryUser->bindParam(':userId', $userId);
+                $queryUser->bindParam(':first_name', $first_name);
+                $queryUser->bindParam(':middle_name', $middle_name);
+                $queryUser->bindParam(':last_name', $last_name);
+                $queryUser->bindParam(':contact_num', $contact_num);
+                $userUpdateSuccess = $queryUser->execute();
+
+                // Update the address information in the 'addresses' table
+                $sqlAddress = "UPDATE addresses
+                            SET house_number = :house_number, 
+                                street = :street, 
+                                barangay = :barangay, 
+                                city = :city, 
+                                province = :province, 
+                                region = :region, 
+                                country = :country, 
+                                zipcode = :zipcode
+                            WHERE user_id = :userId";
+
+                $queryAddress = $connection->prepare($sqlAddress);
+                $queryAddress->bindParam(':userId', $userId);
+                $queryAddress->bindParam(':house_number', $house_number);
+                $queryAddress->bindParam(':street', $street);
+                $queryAddress->bindParam(':barangay', $barangay);
+                $queryAddress->bindParam(':city', $city);
+                $queryAddress->bindParam(':province', $province);
+                $queryAddress->bindParam(':region', $region);
+                $queryAddress->bindParam(':country', $country);
+                $queryAddress->bindParam(':zipcode', $zipcode);
+                $addressUpdateSuccess = $queryAddress->execute();
+
+                // Check if both queries were successful
+                if ($userUpdateSuccess && $addressUpdateSuccess) {
+                    // Both queries were successful
+                    $connection->commit();
+                    echo json_encode(array(
+                        "status" => 1,
+                        "message" => "Profile updated successfully",
+                    ));
+                } else {
+                    // At least one of the queries failed
+                    $connection->rollBack();
+                    echo json_encode(array(
+                        "status" => 0,
+                        "message" => "Error. Profile update failed",
+                    ));
+                }
+            } else {
+                // Handle missing data
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "Missing data",
+                ));
+            }
+        } catch (PDOException $e) {
+            // Rollback the transaction and handle PDOException
+            $connection->rollBack();
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "An error occurred: " . $e->getMessage(),
+            ));
+        } catch (Exception $e) {
+            // Rollback the transaction and handle other exceptions
+            $connection->rollBack();
             echo json_encode(array(
                 "status" => 0,
                 "message" => "An unexpected error occurred: " . $e->getMessage(),
@@ -930,6 +1129,7 @@ class MySite
                     o.*, 
                     GROUP_CONCAT(pi.image) AS images,
                     CONCAT(u.first_name, ' ', COALESCE(u.middle_name, ''), ' ', u.last_name) AS customer_name,
+                    CONCAT(house_number, ', ', street, ', ', barangay, ', ', city, ', ', province, ', ', region, ', ', country, ' ', zipcode) AS address,
                     p.name,
                     p.price,
                     p.description,
@@ -938,6 +1138,7 @@ class MySite
                 FROM orders o
                 LEFT JOIN products p ON o.product_id = p.id
                 LEFT JOIN users u ON o.user_id = u.id
+                LEFT JOIN addresses a ON o.user_id = a.user_id
                 LEFT JOIN products_images pi ON pi.product_id = p.id
                 GROUP BY o.id";
 

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 26, 2024 at 10:57 AM
+-- Generation Time: May 26, 2024 at 12:32 PM
 -- Server version: 10.4.28-MariaDB
 -- PHP Version: 8.2.4
 
@@ -29,6 +29,7 @@ SET time_zone = "+00:00";
 
 CREATE TABLE `addresses` (
   `id` varchar(255) NOT NULL,
+  `user_id` varchar(255) NOT NULL,
   `house_number` varchar(255) NOT NULL,
   `street` varchar(255) NOT NULL,
   `barangay` varchar(255) NOT NULL,
@@ -43,9 +44,8 @@ CREATE TABLE `addresses` (
 -- Dumping data for table `addresses`
 --
 
-INSERT INTO `addresses` (`id`, `house_number`, `street`, `barangay`, `city`, `province`, `region`, `country`, `zipcode`) VALUES
-('6652d6fe513ab', 'asdf', 'asdf', 'asdf', 'asdf', 'asdf', 'asdf', 'Philippines', 'asdf'),
-('6652d9e64164a', '143', 'asdf', 'asdf', 'asdf', 'asdf', 'asdf', 'Philippines', 'asdf');
+INSERT INTO `addresses` (`id`, `user_id`, `house_number`, `street`, `barangay`, `city`, `province`, `region`, `country`, `zipcode`) VALUES
+('66530f62e90af', '66530f62e8d74', '1332', 'TRH', 'RZ', 'MK', 'MM', 'NCR', 'Philippines', '1234');
 
 -- --------------------------------------------------------
 
@@ -163,7 +163,6 @@ CREATE TABLE `users` (
   `first_name` varchar(100) NOT NULL,
   `middle_name` varchar(100) DEFAULT NULL,
   `last_name` varchar(100) NOT NULL,
-  `address_id` varchar(255) DEFAULT NULL,
   `email` varchar(100) NOT NULL,
   `password` varchar(100) NOT NULL,
   `contact_num` varchar(11) NOT NULL,
@@ -177,8 +176,8 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `address_id`, `email`, `password`, `contact_num`, `role`, `isDeactivated`, `createdAt`, `updatedAt`) VALUES
-('6652d6fe513a6', 'admin', 'admin', 'admin', '6652d6fe513ab', 'admin', '21232f297a57a5a743894a0e4a801fc3', '09999999999', 'admin', 0, '2024-05-26 14:30:22', '2024-05-26 16:57:11');
+INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `email`, `password`, `contact_num`, `role`, `isDeactivated`, `createdAt`, `updatedAt`) VALUES
+('66530f62e8d74', 'admin', 'admin', 'admin', 'admin@gmail.com', 'f6fdffe48c908deb0f4c3bd36c032e72', '09999999999', 'admin', 0, '2024-05-26 18:30:58', '2024-05-26 18:32:05');
 
 --
 -- Indexes for dumped tables
@@ -188,7 +187,8 @@ INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `address_id
 -- Indexes for table `addresses`
 --
 ALTER TABLE `addresses`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `addresses_ibfk_1` (`user_id`);
 
 --
 -- Indexes for table `carts`
@@ -223,12 +223,17 @@ ALTER TABLE `products_images`
 --
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `email` (`email`),
-  ADD UNIQUE KEY `address_id` (`address_id`);
+  ADD UNIQUE KEY `email` (`email`);
 
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `addresses`
+--
+ALTER TABLE `addresses`
+  ADD CONSTRAINT `addresses_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `carts`
@@ -248,12 +253,6 @@ ALTER TABLE `orders`
 --
 ALTER TABLE `products_images`
   ADD CONSTRAINT `products_images_ibfk_1` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `users`
---
-ALTER TABLE `users`
-  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`address_id`) REFERENCES `addresses` (`id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
