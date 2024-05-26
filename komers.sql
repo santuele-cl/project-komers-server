@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 26, 2024 at 06:40 AM
+-- Generation Time: May 26, 2024 at 10:57 AM
 -- Server version: 10.4.28-MariaDB
 -- PHP Version: 8.2.4
 
@@ -38,6 +38,14 @@ CREATE TABLE `addresses` (
   `country` varchar(255) DEFAULT NULL,
   `zipcode` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `addresses`
+--
+
+INSERT INTO `addresses` (`id`, `house_number`, `street`, `barangay`, `city`, `province`, `region`, `country`, `zipcode`) VALUES
+('6652d6fe513ab', 'asdf', 'asdf', 'asdf', 'asdf', 'asdf', 'asdf', 'Philippines', 'asdf'),
+('6652d9e64164a', '143', 'asdf', 'asdf', 'asdf', 'asdf', 'asdf', 'Philippines', 'asdf');
 
 -- --------------------------------------------------------
 
@@ -82,6 +90,7 @@ CREATE TABLE `orders` (
   `quantity` int(11) NOT NULL DEFAULT 1,
   `status` varchar(100) NOT NULL DEFAULT 'pending',
   `total_price` int(11) NOT NULL DEFAULT 0,
+  `is_deleted` tinyint(4) NOT NULL DEFAULT 0,
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
   `updatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -96,6 +105,20 @@ CREATE TRIGGER `calculate_total_price` BEFORE INSERT ON `orders` FOR EACH ROW BE
     SELECT price INTO product_price FROM products WHERE id = NEW.product_id;
     -- Calculate the total price
     SET NEW.total_price = product_price * NEW.quantity;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `reduce_product_stock` AFTER INSERT ON `orders` FOR EACH ROW BEGIN
+    DECLARE product_quantity INT;
+
+    -- Get the quantity of the ordered product
+    SELECT quantity INTO product_quantity FROM orders WHERE id = NEW.id;
+
+    -- Update the product stock
+    UPDATE products
+    SET stock = stock - product_quantity
+    WHERE id = NEW.product_id;
 END
 $$
 DELIMITER ;
@@ -145,9 +168,17 @@ CREATE TABLE `users` (
   `password` varchar(100) NOT NULL,
   `contact_num` varchar(11) NOT NULL,
   `role` varchar(100) NOT NULL DEFAULT 'customer',
+  `isDeactivated` tinyint(4) NOT NULL DEFAULT 0,
   `createdAt` datetime NOT NULL DEFAULT current_timestamp(),
   `updatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `address_id`, `email`, `password`, `contact_num`, `role`, `isDeactivated`, `createdAt`, `updatedAt`) VALUES
+('6652d6fe513a6', 'admin', 'admin', 'admin', '6652d6fe513ab', 'admin', '21232f297a57a5a743894a0e4a801fc3', '09999999999', 'admin', 0, '2024-05-26 14:30:22', '2024-05-26 16:57:11');
 
 --
 -- Indexes for dumped tables
