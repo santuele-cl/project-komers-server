@@ -152,7 +152,6 @@ class MySite
 
     public function signup($email, $password)
     {
-
         // Check if the login form has been submitted
         if (isset($email) && isset($password)) {
             // User input
@@ -216,9 +215,11 @@ class MySite
     }
 
     public function addUser($first_name, $middle_name, $last_name, $contact_num, $role, $house_number, $street, $barangay, $city, $province, $region, $country, $zipcode, $email, $password)
+    // public function addUser($first_name, $middle_name, $last_name, $contact_num, $role, $email, $password)
     {
         // Check if all required data is provided
         $isValidInput = isset($first_name, $last_name, $contact_num, $role, $house_number, $street, $barangay, $city, $province, $region, $country, $zipcode, $email, $password) &&
+        // $isValidInput = isset($first_name, $last_name, $contact_num, $role,$email, $password) &&
             !empty($first_name) && !empty($last_name) && !empty($contact_num) &&
             !empty($role) && !empty($house_number) && !empty($street) &&
             !empty($barangay) && !empty($city) && !empty($province) &&
@@ -284,8 +285,6 @@ class MySite
                 $queryAddressInsert->bindParam(':user_id', $userId);
 
                 $queryAddressInsert->execute();
-
-
                 $connection->commit();
 
                 echo json_encode(array(
