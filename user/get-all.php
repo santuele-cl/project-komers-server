@@ -2,4 +2,6 @@
 require_once('../cors.php');
 require_once('../db.php');
 
-$operations->getAllUsers();
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $operations->getAllUsers();
+}

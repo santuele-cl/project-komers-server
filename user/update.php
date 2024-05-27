@@ -2,4 +2,6 @@
 require_once('../cors.php');
 require_once('../db.php');
 
-$operations->updateProfile();
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $operations->updateProfile();
+}
