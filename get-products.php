@@ -2,4 +2,6 @@
 require_once('db.php');
 require_once('cors.php');
 
-$operations->getProducts();
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $operations->getProducts();
+}
