@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 26, 2024 at 12:32 PM
+-- Generation Time: Jun 07, 2024 at 06:13 PM
 -- Server version: 10.4.28-MariaDB
 -- PHP Version: 8.2.4
 
@@ -136,9 +136,18 @@ CREATE TABLE `products` (
   `description` varchar(255) DEFAULT NULL,
   `stock` int(11) NOT NULL DEFAULT 1,
   `brand` varchar(255) DEFAULT NULL,
+  `category` varchar(255) NOT NULL,
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
   `udpatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `products`
+--
+
+INSERT INTO `products` (`id`, `name`, `price`, `description`, `stock`, `brand`, `category`, `createdAt`, `udpatedAt`) VALUES
+('66630d74e1b80', 'mem', 4500, 'asdfsdf', 2, 'asdasd', 'Memory', '2024-06-07 13:39:00', '2024-06-07 15:10:18'),
+('6663221b6f06a', 'gip', 1000, 'asdfsdf', 100, 'asdfsdf', 'GPU', '2024-06-07 15:07:07', '2024-06-07 15:10:25');
 
 -- --------------------------------------------------------
 
@@ -151,6 +160,14 @@ CREATE TABLE `products_images` (
   `product_id` varchar(255) NOT NULL,
   `image` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `products_images`
+--
+
+INSERT INTO `products_images` (`id`, `product_id`, `image`) VALUES
+('66630d74e8227', '66630d74e1b80', 'images/products/66630d74e78b4_pexels-ann-poan-5849392.jpg'),
+('6663221b73c17', '6663221b6f06a', 'images/products/6663221b73a20_pexels-pixabay-273671.jpg');
 
 -- --------------------------------------------------------
 

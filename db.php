@@ -934,7 +934,68 @@ class MySite
         }
     }
 
+    public function getProductById($productId)
+    {
+        try {
+            // Open a database connection
+            $connection = $this->openConnection();
 
+            // Construct the SQL query to fetch a single product by ID
+            $sql = "SELECT 
+                    p.*, 
+                    GROUP_CONCAT(pi.image) AS products_images
+                FROM products p 
+                LEFT JOIN products_images pi ON p.id = pi.product_id
+                WHERE p.id = :productId
+                GROUP BY p.id";
+
+            // Prepare and execute the SQL query
+            $query = $connection->prepare($sql);
+            $query->bindParam(':productId', $productId, PDO::PARAM_INT);
+            $query->execute();
+
+            // Fetch the product data
+            $product = $query->fetch();
+
+            // Check if product was not found
+            if (!$product) {
+                http_response_code(404); // Not Found
+                echo json_encode(array(
+                    "status" => 0,
+                    "message" => "Product not found",
+                ));
+                return;
+            }
+
+            // Process fetched data
+            if ($product['products_images']) {
+                $product['products_images'] = explode(',', $product['products_images']);
+            } else {
+                $product['products_images'] = [];
+            }
+
+            // Return product data as JSON response
+            echo json_encode(array(
+                "status" => 1,
+                "message" => "Product fetched successfully",
+                "data" => $product
+            ));
+        } catch (PDOException $e) {
+            // Handle PDOException
+            http_response_code(500); // Internal Server Error
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "An error occurred: " . $e->getMessage(),
+            ));
+        } catch (Exception $e) {
+            // Handle other exceptions
+            http_response_code(500); // Internal Server Error
+            echo json_encode(array(
+                "status" => 0,
+                "message" => "An unexpected error occurred: " . $e->getMessage(),
+            ));
+        }
+    }
 
 
     public function deleteProduct($product_id)
