@@ -222,7 +222,7 @@ class MySite
     {
         // Check if all required data is provided
         $isValidInput = isset($first_name, $last_name, $contact_num, $role, $house_number, $street, $barangay, $city, $province, $region, $country, $zipcode, $email, $password) &&
-        // $isValidInput = isset($first_name, $last_name, $contact_num, $role,$email, $password) &&
+            // $isValidInput = isset($first_name, $last_name, $contact_num, $role,$email, $password) &&
             !empty($first_name) && !empty($last_name) && !empty($contact_num) &&
             !empty($role) && !empty($house_number) && !empty($street) &&
             !empty($barangay) && !empty($city) && !empty($province) &&
@@ -581,11 +581,11 @@ class MySite
         }
     }
 
-    public function addProduct($name, $price, $description, $stock, $brand, $image)
+    public function addProduct($name, $price, $description, $stock, $brand, $category, $image)
     {
         try {
 
-            $isInputValid = isset($name) && !empty($name) && isset($price) && !empty($price) && isset($description) && !empty($description) && isset($stock) && !empty($stock) && isset($brand) && !empty($brand) && isset($image) && !empty($image);
+            $isInputValid = isset($name) && !empty($name) && isset($price) && !empty($price) && isset($description) && !empty($description) && isset($stock) && !empty($stock) && isset($brand) && !empty($brand) && isset($category) && !empty($category) && isset($image) && !empty($image);
 
             // Check if the login form has been submitted
             if ($isInputValid) {
@@ -594,8 +594,8 @@ class MySite
                 $connection = $this->openConnection();
 
                 // Prepare and execute the SQL query to retrieve user data based on email and password
-                $sql = "INSERT INTO products (id, name, price, description, stock, brand)
-                    VALUES (:id, :name, :price, :description, :stock, :brand)";
+                $sql = "INSERT INTO products (id, name, price, description, stock, brand, category)
+                    VALUES (:id, :name, :price, :description, :stock, :brand, :category)";
 
                 $query = $connection->prepare($sql);
                 $query->bindParam(':id', $productId);
@@ -604,6 +604,7 @@ class MySite
                 $query->bindParam(':description', $description);
                 $query->bindParam(':stock', $stock);
                 $query->bindParam(':brand', $brand);
+                $query->bindParam(':category', $category);
                 $query->execute();
 
 
@@ -850,19 +851,58 @@ class MySite
             // Open a database connection
             $connection = $this->openConnection();
 
-            // Prepare and execute the SQL query to retrieve products data
+            // Construct the initial part of the SQL query
             $sql = "SELECT p.*, GROUP_CONCAT(pi.image) AS products_images
-                    FROM products p 
-                    LEFT JOIN products_images pi ON p.id = pi.product_id
-                    GROUP BY p.id";
+                FROM products p 
+                LEFT JOIN products_images pi ON p.id = pi.product_id";
 
+            // Initialize an array to hold the conditions
+            $conditions = [];
+
+            // Check if category filter is provided
+            if (!empty($_GET['category'])) {
+                $categories = explode(',', $_GET['category']);
+                $categoryConditions = implode("','", $categories);
+                $conditions[] = "p.category IN ('$categoryConditions')";
+            }
+
+            // Check if search query filter is provided
+            if (isset($_GET['queryString'])) {
+                $queryString = $_GET['queryString'];
+                $conditions[] = "(p.name LIKE '%$queryString%' OR p.description LIKE '%$queryString%' OR p.brand LIKE '%$queryString%')";
+            }
+
+            // Check if both minPrice and maxPrice are provided and not empty
+            if (isset($_GET['minPrice'], $_GET['maxPrice']) && !empty($_GET["minPrice"]) && !empty($_GET["maxPrice"])) {
+                $minPrice = floatval($_GET['minPrice']);
+                $maxPrice = floatval($_GET['maxPrice']);
+                $conditions[] = "p.price BETWEEN $minPrice AND $maxPrice";
+            } elseif (isset($_GET['minPrice']) && !empty($_GET['minPrice'])) {
+                // Only minPrice is set, assume open-ended maximum price
+                $minPrice = floatval($_GET['minPrice']);
+                $conditions[] = "p.price >= $minPrice";
+            } elseif (isset($_GET['maxPrice']) && !empty($_GET['maxPrice'])) {
+                // Only maxPrice is set, assume open-ended minimum price
+                $maxPrice = floatval($_GET['maxPrice']);
+                $conditions[] = "p.price <= $maxPrice";
+            }
+
+            // Append the conditions to the SQL query
+            if (count($conditions) > 0) {
+                $sql .= " WHERE " . implode(' AND ', $conditions);
+            }
+
+            // Add GROUP BY clause at the end
+            $sql .= " GROUP BY p.id";
+
+            // Prepare and execute the SQL query
             $query = $connection->prepare($sql);
-
             $query->execute();
 
-            $products = $query->fetchAll(); // Fetching data from the server and it will return an array
+            // Fetch products data
+            $products = $query->fetchAll();
 
-            // Process the fetched data
+            // Process fetched data
             foreach ($products as &$product) {
                 if ($product['products_images']) {
                     $product['products_images'] = explode(',', $product['products_images']);
@@ -871,7 +911,7 @@ class MySite
                 }
             }
 
-            // Return the products data
+            // Return products data as JSON response
             echo json_encode(array(
                 "status" => 1,
                 "message" => "Products fetched successfully",
@@ -893,6 +933,8 @@ class MySite
             ));
         }
     }
+
+
 
 
     public function deleteProduct($product_id)
