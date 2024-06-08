@@ -951,7 +951,7 @@ class MySite
 
             // Prepare and execute the SQL query
             $query = $connection->prepare($sql);
-            $query->bindParam(':productId', $productId, PDO::PARAM_INT);
+            $query->bindParam(':productId', $productId);
             $query->execute();
 
             // Fetch the product data
