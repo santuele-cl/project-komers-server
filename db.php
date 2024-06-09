@@ -56,11 +56,13 @@ class MySite
 
     public function getUserSession()
     {
+        // Start the session if it's not already started
         if (!isset($_SESSION)) {
             session_start();
         }
 
-        if (isset($_SESSION["userdata"]) && !empty($_SESSION["userdata"])) {
+        // Check if session data exists and is not empty
+        if (isset($_SESSION["userdata"]) && !empty($_SESSION["userdata"]) && isset($_SESSION["userdata"]["user_id"]) && !empty($_SESSION["userdata"]["user_id"])) {
             echo json_encode(array(
                 "status" => 1,
                 "message" => "Success",
@@ -83,7 +85,7 @@ class MySite
     {
         try {
             // Start the session if it's not already started
-            if (session_status() == PHP_SESSION_NONE) {
+            if (!isset($_SESSION)) {
                 session_start();
             }
 
@@ -92,6 +94,20 @@ class MySite
 
             // Destroy the session
             session_destroy();
+
+            // Unset the session cookie to fully log out the user
+            if (ini_get("session.use_cookies")) {
+                $params = session_get_cookie_params();
+                setcookie(
+                    session_name(),
+                    '',
+                    time() - 42000,
+                    $params["path"],
+                    $params["domain"],
+                    $params["secure"],
+                    $params["httponly"]
+                );
+            }
 
             echo json_encode(array(
                 "status" => 1,
@@ -1047,39 +1063,69 @@ class MySite
 
         $isInputValid = isset($productId) && !empty($productId) && isset($quantity) && !empty($quantity);
 
-        // Check if the login form has been submitted
+        // Check if the input is valid
         if ($isInputValid) {
             try {
                 // Open a database connection
                 $connection = $this->openConnection();
 
-                // Prepare and execute the SQL query to retrieve user data based on email and password
-                $sql = "INSERT INTO orders (id,product_id, quantity, user_id)
-                    VALUES (:id,:product_id, :quantity, :user_id)";
+                // Check if the product exists and has sufficient stock
+                $stockQuery = "SELECT stock FROM products WHERE id = :product_id";
+                $stockStmt = $connection->prepare($stockQuery);
+                $stockStmt->bindParam(':product_id', $productId);
+                $stockStmt->execute();
+                $product = $stockStmt->fetch(PDO::FETCH_ASSOC);
 
-                $orderId = uniqid();
+                if ($product) {
+                    $currentStock = $product['stock'];
 
-                $query = $connection->prepare($sql);
-                $query->bindParam(':id', $orderId);
-                $query->bindParam(':product_id', $productId);
-                $query->bindParam(':quantity', $quantity);
-                $query->bindParam(':user_id', $_SESSION['userdata']['user_id']);
-                $query->execute();
+                    if ($currentStock >= $quantity) {
+                        // Prepare and execute the SQL query to insert the order
+                        $sql = "INSERT INTO orders (id, product_id, quantity, user_id)
+                            VALUES (:id, :product_id, :quantity, :user_id)";
 
-                echo json_encode(array(
-                    "status" => 1,
-                    "message" => "Order place successfully",
-                ));
+                        $orderId = uniqid();
+
+                        $query = $connection->prepare($sql);
+                        $query->bindParam(':id', $orderId);
+                        $query->bindParam(':product_id', $productId);
+                        $query->bindParam(':quantity', $quantity);
+                        $query->bindParam(':user_id', $_SESSION['userdata']['user_id']);
+                        $query->execute();
+
+                        // Update the stock of the product
+                        $updateStockQuery = "UPDATE products SET stock = stock - :quantity WHERE id = :product_id";
+                        $updateStockStmt = $connection->prepare($updateStockQuery);
+                        $updateStockStmt->bindParam(':quantity', $quantity);
+                        $updateStockStmt->bindParam(':product_id', $productId);
+                        $updateStockStmt->execute();
+
+                        echo json_encode(array(
+                            "status" => 1,
+                            "message" => "Order placed successfully",
+                        ));
+                    } else {
+                        http_response_code(400);
+                        echo json_encode(array(
+                            "status" => 0,
+                            "message" => "Insufficient stock",
+                        ));
+                    }
+                } else {
+                    http_response_code(404);
+                    echo json_encode(array(
+                        "status" => 0,
+                        "message" => "Product not found",
+                    ));
+                }
             } catch (PDOException $e) {
                 http_response_code(500);
-
                 echo json_encode(array(
                     "status" => 0,
                     "message" => "An error occurred: " . $e->getMessage(),
                 ));
             } catch (Exception $e) {
                 http_response_code(500);
-
                 echo json_encode(array(
                     "status" => 0,
                     "message" => "An unexpected error occurred: " . $e->getMessage(),
@@ -1087,13 +1133,13 @@ class MySite
             }
         } else {
             http_response_code(400);
-
             echo json_encode(array(
                 "status" => 0,
                 "message" => "Missing data",
             ));
         }
     }
+
 
 
     public function cartToOrder($cartId)
